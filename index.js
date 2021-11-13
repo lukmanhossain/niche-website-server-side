@@ -20,7 +20,58 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 async function run() {
     try {
         await client.connect();
-        console.log('database connect');
+        const database = client.db('cycle_bazar');
+        const bookingCollection = database.collection('bookings');
+        const usersCollection = database.collection('users');
+
+        app.get('/bookings', async (req, res) => {
+            const email = req.query.email;
+            const query = { email: email };
+            const cursor = bookingCollection.find(query);
+            const bookings = await cursor.toArray();
+            res.json(bookings);
+        })
+
+        app.post('/bookings', async (req, res) => {
+            const booking = req.body;
+            const result = await bookingCollection.insertOne(booking);
+            res.json(result)
+        });
+
+        app.get('/users/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email };
+            const user = await usersCollection.findOne(query);
+            let isAdmin = false;
+            if (user?.role === 'admin') {
+                isAdmin = true;
+            }
+            res.json({ admin: isAdmin });
+        });
+
+        app.post('/users', async (req, res) => {
+            const user = req.body;
+            const result = await usersCollection.insertOne(user);
+            console.log(result);
+            res.json(result);
+        });
+
+        app.put('/users', async (req, res) => {
+            const user = req.body;
+            const filter = { email: user.email };
+            const options = { upsert: true };
+            const updateDoc = { $set: user };
+            const result = await usersCollection.updateOne(filter, updateDoc, options);
+            res.json(result);
+        });
+        app.put('/users/admin', async (req, res) => {
+            const user = req.body;
+            console.log('put', user);
+            const filter = { email: user.email };
+            const updateDoc = { $set: { role: 'admin' } };
+            const result = await usersCollection.updateOne(filter, updateDoc);
+            res.json(result);
+        });
     }
     finally {
         // await client.close();
@@ -31,7 +82,7 @@ run().catch(console.dir);
 
 
 app.get('/', (req, res) => {
-    res.send('Hello World!')
+    res.send('Cycle Bazar Server Connected Successfully')
 })
 
 app.listen(port, () => {
